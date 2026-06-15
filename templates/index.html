@@ -361,9 +361,9 @@ function renderResults(data) {
       </div>
       ${legs}
       <div class="fare-note">
-        ⚠️ <strong>Prix indicatif tarif "Light"</strong> (sans bagage en soute — bagage cabine uniquement).<br>
-        Sur le site de la compagnie, choisissez <span class="fare-light">✅ Light / Economy Light</span> pour ce prix.<br>
-        Le tarif <span class="fare-std">Standard (avec valise)</span> coûte généralement <strong>+200 à +600 € de plus</strong>.
+        ⚠️ <strong>Prix affiché = tarif "Light"</strong> (bagage cabine uniquement, sans valise en soute).<br>
+        🧳 <strong>Avec 1 valise (Standard)</strong> : estimé <span class="fare-std">~EUR ${(it.prix + 350).toLocaleString("fr-FR",{minimumFractionDigits:2})}</span> — choisissez <span class="fare-light">✅ "Light"</span> sur le site pour garder ce prix.<br>
+        💡 Ajouter un bagage séparément après réservation est souvent moins cher que le tarif Standard.
       </div>
       <div class="booking-btns">
         <button class="btn-book btn-af ${airlineCls}" onclick="openPrivate('${airlineUrl}')">
