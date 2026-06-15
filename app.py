@@ -1,5 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import requests, os, re, time, threading, hashlib, json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+executor = ThreadPoolExecutor(max_workers=20)  # pool partagé entre tous les users
 
 app = Flask(__name__)
 
@@ -129,10 +132,12 @@ def search():
         return jsonify(cached)
 
     try:
-        r = requests.get(
+        future = executor.submit(
+            requests.get,
             f"https://{API_HOST}/flights/searchFlights",
             headers=HEADERS, params=params, timeout=60
         )
+        r    = future.result(timeout=65)
         itin = r.json().get("itineraries", [])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
