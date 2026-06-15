@@ -89,6 +89,12 @@
   .tip-box ul { margin-top:6px; padding-left:18px; }
   .tip-box li { margin:3px 0; }
 
+  /* ── Note tarif ── */
+  .fare-note { background:#1a1a2e; border-left:3px solid var(--yellow); border-radius:0 6px 6px 0; padding:8px 12px; margin-top:10px; font-size:.82rem; color:var(--gray); }
+  .fare-note strong { color:var(--yellow); }
+  .fare-note span.fare-light { color:var(--green); font-weight:700; }
+  .fare-note span.fare-std   { color:var(--red);   font-weight:700; }
+
   /* ── Toast ── */
   #toast { position:fixed; bottom:24px; right:24px; background:var(--green); color:#000; padding:12px 20px; border-radius:10px; font-weight:700; font-size:.95rem; display:none; z-index:999; box-shadow:0 4px 20px rgba(0,0,0,.5); }
 
@@ -354,6 +360,11 @@ function renderResults(data) {
         ${badge}
       </div>
       ${legs}
+      <div class="fare-note">
+        ⚠️ <strong>Prix indicatif tarif "Light"</strong> (sans bagage en soute — bagage cabine uniquement).<br>
+        Sur le site de la compagnie, choisissez <span class="fare-light">✅ Light / Economy Light</span> pour ce prix.<br>
+        Le tarif <span class="fare-std">Standard (avec valise)</span> coûte généralement <strong>+200 à +600 € de plus</strong>.
+      </div>
       <div class="booking-btns">
         <button class="btn-book btn-af ${airlineCls}" onclick="openPrivate('${airlineUrl}')">
           ✈ ${carrierLabel} — Réserver direct
