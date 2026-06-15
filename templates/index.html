@@ -308,11 +308,12 @@ async function search() {
   }
 
   status.innerHTML = `✅ ${data.length} vol(s) trouvé(s) pour ${orig.name} → ${dest.name}`;
-  renderResults(data);
+  const totalPax = (parseInt(document.getElementById("adults").value)||1) + (parseInt(document.getElementById("children").value)||0);
+  renderResults(data, totalPax);
 }
 
 // ── Affichage résultats ────────────────────────────────────────
-function renderResults(data) {
+function renderResults(data, totalPax) {
   const container = document.getElementById("results");
   container.innerHTML = "";
 
@@ -362,8 +363,8 @@ function renderResults(data) {
       ${legs}
       <div class="fare-note">
         ⚠️ <strong>Prix affiché = tarif "Light"</strong> (bagage cabine uniquement, sans valise en soute).<br>
-        🧳 <strong>Avec 1 valise (Standard)</strong> : estimé <span class="fare-std">~EUR ${(it.prix + 350).toLocaleString("fr-FR",{minimumFractionDigits:2})}</span> — choisissez <span class="fare-light">✅ "Light"</span> sur le site pour garder ce prix.<br>
-        💡 Ajouter un bagage séparément après réservation est souvent moins cher que le tarif Standard.
+        🧳 <strong>Avec 1 valise/passager (${totalPax} valises)</strong> : estimé <span class="fare-std">~EUR ${(it.prix + totalPax * 150).toLocaleString("fr-FR",{minimumFractionDigits:2})}</span> (+150€/pers.) — choisissez <span class="fare-light">✅ "Light"</span> sur le site pour garder ce prix.<br>
+        💡 Ajouter les bagages séparément après réservation est souvent moins cher que le tarif Standard.
       </div>
       <div class="booking-btns">
         <button class="btn-book btn-af ${airlineCls}" onclick="openPrivate('${airlineUrl}')">
