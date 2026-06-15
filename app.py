@@ -7,6 +7,50 @@ API_KEY  = os.environ.get("RAPIDAPI_KEY", "86d656bf45msh5e9078844da826cp1f1591js
 API_HOST = "skyscanner-flights-travel-api.p.rapidapi.com"
 HEADERS  = {"x-rapidapi-key": API_KEY, "x-rapidapi-host": API_HOST}
 
+# Liens directs compagnies (sans OTA)
+AIRLINE_URLS = {
+    "air france":         "https://wwws.airfrance.fr/search/offers",
+    "royal air maroc":    "https://www.royalairmaroc.com/fr-fr/reservation/recherche-vol",
+    "ethiopian airlines": "https://www.ethiopianairlines.com/et/booking/flight-booking",
+    "turkish airlines":   "https://www.turkishairlines.com/fr-fr/flights/",
+    "klm":                "https://www.klm.com/fr/fr",
+    "brussels airlines":  "https://www.brusselsairlines.com/fr/fr/",
+    "transavia":          "https://www.transavia.com/fr-FR/accueil/",
+    "lufthansa":          "https://www.lufthansa.com/fr/fr/homepage",
+    "kenya airways":      "https://www.kenya-airways.com/fr/",
+    "tap air portugal":   "https://www.flytap.com/fr-fr/",
+    "corsair":            "https://www.corsair.fr/",
+    "asky":               "https://flyasky.com/",
+    "air senegal":        "https://www.airsenegal.com/",
+    "egyptair":           "https://www.egyptair.com/fr/",
+    "emirates":           "https://www.emirates.com/fr/french/",
+    "qatar airways":      "https://www.qatarairways.com/fr-fr/",
+    "swiss":              "https://www.swiss.com/fr/fr/",
+    "iberia":             "https://www.iberia.com/fr/",
+}
+
+def get_airline_url(carrier_name, legs, adults=1, children=0):
+    """Génère un lien direct vers la compagnie selon le vol."""
+    key = carrier_name.lower()
+
+    if "air france" in key:
+        segments = ",".join(
+            f"{l['origin']}:{l['destination']}:{l['departure'][:10]}"
+            for l in legs
+        )
+        pax = f"ADT:{adults}"
+        if children:
+            pax += f"_CHD:{children}"
+        return f"https://wwws.airfrance.fr/search/offers?pax={pax}&cabin=ECONOMY&segments={segments}"
+
+    for airline_key, url in AIRLINE_URLS.items():
+        if airline_key in key:
+            return url
+
+    # Fallback Google Flights
+    return "https://www.google.com/travel/flights?hl=fr&curr=EUR"
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -24,18 +68,18 @@ def airport():
 def search():
     d = request.json
     params = dict(
-        originSkyId      = d["orig_sky"],
-        destinationSkyId = d["dest_sky"],
-        originEntityId   = d["orig_entity"],
+        originSkyId         = d["orig_sky"],
+        destinationSkyId    = d["dest_sky"],
+        originEntityId      = d["orig_entity"],
         destinationEntityId = d["dest_entity"],
-        date             = d["dep"],
-        cabinClass       = d.get("cabin","economy"),
-        adults           = str(d.get("adults",1)),
-        currency         = "EUR",
-        market           = "FR",
-        countryCode      = "FR",
-        locale           = "fr-FR",
-        sortBy           = "cheapest",
+        date                = d["dep"],
+        cabinClass          = d.get("cabin","economy"),
+        adults              = str(d.get("adults",1)),
+        currency            = "EUR",
+        market              = "FR",
+        countryCode         = "FR",
+        locale              = "fr-FR",
+        sortBy              = "cheapest",
     )
     if d.get("ret"):      params["returnDate"]   = d["ret"]
     if d.get("children"): params["children"]     = str(d["children"])
@@ -53,34 +97,11 @@ def search():
     itin.sort(key=lambda x: float(x.get("price",{}).get("amount",9e9)))
 
     results = []
-    total_pax = d.get("adults",1) + d.get("children",0)
+    adults   = d.get("adults",1)
+    children = d.get("children",0)
 
     for it in itin[:8]:
         prix = float(it["price"]["amount"])
-        url  = it.get("bookingUrl","")
-        url  = re.sub(r'passengers=\d+', f'passengers={total_pax}', url)
-        if d.get("children") and "children" not in url:
-            url += f"&children={d['children']}&childrenAges={d.get('ages','')}"
-
-        # Lien Air France direct (sans OTA)
-        segments = ""
-        for leg in it.get("legs",[]):
-            o = leg.get("origin","")
-            de = leg.get("destination","")
-            dt = leg.get("departure","")[:10]
-            segments += f"{o}:{de}:{dt},"
-        segments = segments.rstrip(",")
-
-        pax_af = f"ADT:{d.get('adults',1)}"
-        if d.get("children"): pax_af += f"_CHD:{d['children']}"
-
-        af_url = (f"https://wwws.airfrance.fr/search/offers?"
-                  f"pax={pax_af}&cabin=ECONOMY&segments={segments}")
-
-        # Lien Google Flights
-        gf_url = (f"https://www.google.com/travel/flights/search?"
-                  f"tfs=&hl=fr&curr=EUR&q=vols+{it['legs'][0].get('origin','')}+"
-                  f"{it['legs'][0].get('destination','')}")
 
         legs_data = []
         for leg in it.get("legs",[]):
@@ -95,11 +116,23 @@ def search():
                 "carriers":    [c.get("name","") for c in leg.get("carriers",[])],
             })
 
+        # Compagnie principale = 1er transporteur du 1er leg
+        primary_carrier = ""
+        if it.get("legs") and it["legs"][0].get("carriers"):
+            primary_carrier = it["legs"][0]["carriers"][0].get("name","")
+
+        airline_url  = get_airline_url(primary_carrier, legs_data, adults, children)
+
+        # Google Flights
+        o  = legs_data[0]["origin"]
+        de = legs_data[0]["destination"]
+        gf_url = f"https://www.google.com/travel/flights?hl=fr&curr=EUR&q=vols+{o}+{de}"
+
         results.append({
-            "prix":    prix,
-            "legs":    legs_data,
-            "skyscanner_url": url,
-            "airfrance_url":  af_url,
+            "prix":           prix,
+            "legs":           legs_data,
+            "primary_carrier": primary_carrier,
+            "airline_url":    airline_url,
             "google_url":     gf_url,
         })
 

@@ -74,6 +74,12 @@
   .btn-book { flex:1; min-width:180px; padding:11px 14px; border:none; border-radius:8px; font-size:.9rem; font-weight:700; cursor:pointer; transition:opacity .2s; text-align:center; }
   .btn-book:hover { opacity:.85; }
   .btn-af   { background:#002157; color:#fff; border:2px solid #0047ab; }
+  .btn-af.ram   { background:#006233; border-color:#004d28; }
+  .btn-af.et    { background:#006837; border-color:#004d28; }
+  .btn-af.tk    { background:#c70000; border-color:#900; }
+  .btn-af.kl    { background:#00a1de; border-color:#007fb5; }
+  .btn-af.sn    { background:#003580; border-color:#002760; }
+  .btn-af.other { background:#333; border-color:#555; }
   .btn-gf   { background:#fff; color:#000; }
   .btn-copy { background:var(--purple); color:#fff; }
 
@@ -112,7 +118,7 @@
       <li>Utilisez toujours la <strong>navigation privée</strong> (Firefox: ⌘+Shift+P | Chrome: ⌘+Shift+N)</li>
       <li>Installez <strong>uBlock Origin</strong> pour bloquer les trackers publicitaires</li>
       <li>Réservez <strong>en une seule session</strong> sans revenir en arrière</li>
-      <li>Cliquez sur <strong>"Air France Direct"</strong> pour éviter les agences intermédiaires</li>
+      <li>Cliquez sur <strong>"[Compagnie] — Réserver direct"</strong> pour aller directement sur le site officiel</li>
     </ul>
   </div>
 
@@ -327,6 +333,19 @@ function renderResults(data) {
         </div>`;
     }).join("");
 
+    // Couleur bouton selon compagnie
+    const carrier = (it.primary_carrier||"").toLowerCase();
+    let airlineCls = "other";
+    if (carrier.includes("air france"))          airlineCls = "";
+    else if (carrier.includes("royal air maroc")) airlineCls = "ram";
+    else if (carrier.includes("ethiopian"))       airlineCls = "et";
+    else if (carrier.includes("turkish"))         airlineCls = "tk";
+    else if (carrier.includes("klm"))             airlineCls = "kl";
+    else if (carrier.includes("brussels"))        airlineCls = "sn";
+
+    const carrierLabel = it.primary_carrier || "Compagnie";
+    const airlineUrl   = it.airline_url;
+
     const card = document.createElement("div");
     card.className = `result-card ${cls}`;
     card.innerHTML = `
@@ -336,14 +355,14 @@ function renderResults(data) {
       </div>
       ${legs}
       <div class="booking-btns">
-        <button class="btn-book btn-af" onclick="openPrivate('${it.airfrance_url}')">
-          ✈ Air France Direct
+        <button class="btn-book btn-af ${airlineCls}" onclick="openPrivate('${airlineUrl}')">
+          ✈ ${carrierLabel} — Réserver direct
         </button>
-        <button class="btn-book btn-gf" onclick="openGF('${it.orig_sky||""}','${it.dest_sky||""}')">
+        <button class="btn-book btn-gf" onclick="window.open('${it.google_url}','_blank','noopener,noreferrer')">
           🔍 Google Flights
         </button>
-        <button class="btn-book btn-copy" onclick="copyLink('${it.airfrance_url}')">
-          📋 Copier lien Air France
+        <button class="btn-book btn-copy" onclick="copyLink('${airlineUrl}')">
+          📋 Copier lien
         </button>
       </div>`;
     container.appendChild(card);
