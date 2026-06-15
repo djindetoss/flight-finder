@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: flight-finder
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: RAPIDAPI_KEY
+        value: 86d656bf45msh5e9078844da826cp1f1591jsn6c8215f506fd

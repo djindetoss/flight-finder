@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✈ Flight Finder — Billets pas chers</title>
+<style>
+  :root {
+    --bg:#0d1117; --card:#161b22; --border:#30363d;
+    --blue:#58a6ff; --green:#3fb950; --yellow:#d29922;
+    --red:#f85149; --white:#e6edf3; --gray:#8b949e;
+    --purple:#a371f7;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--white); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+
+  header { background:linear-gradient(135deg,#1a2332,#0d1117); padding:24px; text-align:center; border-bottom:1px solid var(--border); }
+  header h1 { font-size:2rem; color:var(--blue); }
+  header p  { color:var(--gray); margin-top:6px; font-size:.95rem; }
+
+  .container { max-width:960px; margin:0 auto; padding:24px 16px; }
+
+  /* ── Formulaire ── */
+  .form-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-row  { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .full { grid-column:1/-1; }
+
+  label { display:block; font-size:.82rem; color:var(--gray); margin-bottom:5px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+  input, select { width:100%; background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--white); font-size:.95rem; outline:none; transition:border .2s; }
+  input:focus, select:focus { border-color:var(--blue); }
+  select option { background:#161b22; }
+
+  .pax-row { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+  .pax-col { flex:1; min-width:120px; }
+  .ages-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center; }
+  .ages-row label { text-transform:none; font-size:.85rem; color:var(--gray); margin:0; }
+  .ages-row input  { width:56px; text-align:center; }
+
+  .opts { display:flex; gap:20px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+  .checkbox-wrap { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .checkbox-wrap input[type=checkbox] { width:18px; height:18px; accent-color:var(--blue); cursor:pointer; }
+
+  .btn-search { width:100%; margin-top:20px; padding:14px; background:var(--blue); color:#000; font-size:1.05rem; font-weight:700; border:none; border-radius:10px; cursor:pointer; transition:background .2s; }
+  .btn-search:hover { background:#79b8ff; }
+  .btn-search:disabled { background:var(--gray); cursor:not-allowed; }
+
+  /* ── Status ── */
+  #status { text-align:center; padding:12px; font-size:.95rem; color:var(--yellow); min-height:36px; }
+
+  /* ── Résultats ── */
+  .result-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:14px; transition:border .2s; }
+  .result-card.best   { border-color:var(--green); }
+  .result-card.second { border-color:var(--yellow); }
+
+  .result-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .price { font-size:1.6rem; font-weight:700; }
+  .best   .price { color:var(--green); }
+  .second .price { color:var(--yellow); }
+  .result-card:not(.best):not(.second) .price { color:var(--white); }
+  .badge { font-size:.75rem; padding:3px 10px; border-radius:20px; font-weight:700; background:var(--green); color:#000; }
+
+  .leg { display:flex; align-items:center; gap:12px; background:#0d1117; border-radius:8px; padding:10px 14px; margin-bottom:8px; flex-wrap:wrap; }
+  .leg-route { font-size:1.1rem; font-weight:700; color:var(--white); }
+  .leg-time  { color:var(--gray); font-size:.88rem; }
+  .leg-info  { display:flex; gap:10px; font-size:.82rem; flex-wrap:wrap; }
+  .tag-direct { color:var(--green); font-weight:700; }
+  .tag-stop   { color:var(--red); }
+  .tag-carrier{ color:var(--blue); }
+  .tag-dur    { color:var(--gray); }
+
+  /* ── Boutons réservation ── */
+  .booking-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .btn-book { flex:1; min-width:180px; padding:11px 14px; border:none; border-radius:8px; font-size:.9rem; font-weight:700; cursor:pointer; transition:opacity .2s; text-align:center; }
+  .btn-book:hover { opacity:.85; }
+  .btn-af   { background:#002157; color:#fff; border:2px solid #0047ab; }
+  .btn-gf   { background:#fff; color:#000; }
+  .btn-copy { background:var(--purple); color:#fff; }
+
+  /* ── Anti-tracking banner ── */
+  .tip-box { background:#161b22; border:1px solid var(--yellow); border-radius:10px; padding:14px 18px; margin-bottom:20px; font-size:.88rem; color:var(--gray); }
+  .tip-box strong { color:var(--yellow); }
+  .tip-box ul { margin-top:6px; padding-left:18px; }
+  .tip-box li { margin:3px 0; }
+
+  /* ── Toast ── */
+  #toast { position:fixed; bottom:24px; right:24px; background:var(--green); color:#000; padding:12px 20px; border-radius:10px; font-weight:700; font-size:.95rem; display:none; z-index:999; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+
+  /* Spinner */
+  .spinner { display:inline-block; width:18px; height:18px; border:3px solid rgba(255,255,255,.2); border-top-color:var(--white); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:8px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media(max-width:600px) {
+    .form-grid, .form-row { grid-template-columns:1fr; }
+    .booking-btns { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✈ Flight Finder</h1>
+  <p>Trouvez le billet le moins cher — Anti-tracking intégré 🛡️</p>
+</header>
+
+<div class="container">
+
+  <!-- Anti-tracking tips -->
+  <div class="tip-box">
+    <strong>🛡️ Conseils anti-tracking (prix stables) :</strong>
+    <ul>
+      <li>Utilisez toujours la <strong>navigation privée</strong> (Firefox: ⌘+Shift+P | Chrome: ⌘+Shift+N)</li>
+      <li>Installez <strong>uBlock Origin</strong> pour bloquer les trackers publicitaires</li>
+      <li>Réservez <strong>en une seule session</strong> sans revenir en arrière</li>
+      <li>Cliquez sur <strong>"Air France Direct"</strong> pour éviter les agences intermédiaires</li>
+    </ul>
+  </div>
+
+  <!-- Formulaire -->
+  <div class="form-card">
+    <div class="form-grid">
+      <div>
+        <label>🛫 Ville de départ</label>
+        <select id="orig-select" onchange="toggleCustom('orig')">
+          <option value="Paris Charles de Gaulle">Paris CDG 🇫🇷</option>
+          <option value="Paris Orly">Paris Orly 🇫🇷</option>
+          <option value="Brussels">Bruxelles 🇧🇪</option>
+          <option value="Amsterdam">Amsterdam 🇳🇱</option>
+          <option value="London Heathrow">Londres 🇬🇧</option>
+          <option value="__custom__">Autre…</option>
+        </select>
+        <input id="orig-custom" placeholder="Saisir une ville…" style="margin-top:6px;display:none">
+      </div>
+      <div>
+        <label>🛬 Destination</label>
+        <select id="dest-select" onchange="toggleCustom('dest')">
+          <option value="Cotonou">Cotonou, Bénin 🇧🇯</option>
+          <option value="Lagos">Lagos, Nigeria 🇳🇬</option>
+          <option value="Abidjan">Abidjan, Côte d'Ivoire 🇨🇮</option>
+          <option value="Dakar">Dakar, Sénégal 🇸🇳</option>
+          <option value="Douala">Douala, Cameroun 🇨🇲</option>
+          <option value="Libreville">Libreville, Gabon 🇬🇦</option>
+          <option value="Lome">Lomé, Togo 🇹🇬</option>
+          <option value="Accra">Accra, Ghana 🇬🇭</option>
+          <option value="New York JFK">New York JFK 🇺🇸</option>
+          <option value="Montreal">Montréal 🇨🇦</option>
+          <option value="Brussels">Bruxelles 🇧🇪</option>
+          <option value="Madrid">Madrid 🇪🇸</option>
+          <option value="__custom__">Autre…</option>
+        </select>
+        <input id="dest-custom" placeholder="Saisir une ville…" style="margin-top:6px;display:none">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>📅 Date aller</label>
+        <input type="date" id="dep" value="2026-08-12">
+      </div>
+      <div>
+        <label>📅 Date retour (vide = aller simple)</label>
+        <input type="date" id="ret" value="2026-08-28">
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <label>👥 Passagers</label>
+      <div class="pax-row">
+        <div class="pax-col">
+          <label>Adultes</label>
+          <input type="number" id="adults" value="2" min="1" max="9">
+        </div>
+        <div class="pax-col">
+          <label>Enfants (0-17 ans)</label>
+          <input type="number" id="children" value="1" min="0" max="6" oninput="updateAges()">
+        </div>
+        <div class="pax-col">
+          <label>Cabine</label>
+          <select id="cabin">
+            <option value="economy">Economy</option>
+            <option value="premium_economy">Premium Economy</option>
+            <option value="business">Business</option>
+          </select>
+        </div>
+      </div>
+      <div class="ages-row" id="ages-row"></div>
+    </div>
+
+    <div class="opts">
+      <label class="checkbox-wrap">
+        <input type="checkbox" id="direct" checked>
+        ✅ Vols directs uniquement
+      </label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="margin:0;text-transform:none;font-size:.9rem">💶 Budget max (EUR) :</label>
+        <input type="number" id="budget" value="5000" style="width:100px">
+      </div>
+    </div>
+
+    <button class="btn-search" id="search-btn" onclick="search()">
+      🔍 Rechercher les vols
+    </button>
+  </div>
+
+  <div id="status"></div>
+  <div id="results"></div>
+</div>
+
+<div id="toast">✅ Lien copié ! Collez dans Firefox privé (⌘+V)</div>
+
+<script>
+// ── Init ages ──────────────────────────────────────────────────
+updateAges();
+
+function updateAges() {
+  const n = parseInt(document.getElementById("children").value) || 0;
+  const row = document.getElementById("ages-row");
+  row.innerHTML = "";
+  if (n === 0) return;
+  const lbl = document.createElement("label");
+  lbl.textContent = "Âges des enfants :";
+  row.appendChild(lbl);
+  for (let i = 0; i < n; i++) {
+    const l = document.createElement("label");
+    l.textContent = `E${i+1}`;
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = 0; inp.max = 17; inp.value = 4;
+    inp.id = `age_${i}`; inp.className = "age-input";
+    row.appendChild(l); row.appendChild(inp);
+  }
+}
+
+function toggleCustom(which) {
+  const sel = document.getElementById(`${which}-select`);
+  const cus = document.getElementById(`${which}-custom`);
+  cus.style.display = sel.value === "__custom__" ? "block" : "none";
+}
+
+function getQuery(which) {
+  const sel = document.getElementById(`${which}-select`);
+  if (sel.value === "__custom__") return document.getElementById(`${which}-custom`).value.trim();
+  return sel.value;
+}
+
+// ── Recherche principale ───────────────────────────────────────
+async function search() {
+  const btn = document.getElementById("search-btn");
+  const status = document.getElementById("status");
+  const results = document.getElementById("results");
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Recherche en cours…';
+  results.innerHTML = "";
+
+  const origQ = getQuery("orig");
+  const destQ = getQuery("dest");
+
+  // 1. Résoudre aéroports
+  status.innerHTML = `🔍 Résolution aéroport départ : ${origQ}…`;
+  const origPlaces = await fetch(`/api/airport?q=${encodeURIComponent(origQ)}`).then(r=>r.json());
+  const orig = (origPlaces.find(p=>p.placeType==="AIRPORT") || origPlaces[0]);
+  if (!orig) { status.innerHTML = "❌ Aéroport départ introuvable."; btn.disabled=false; btn.innerHTML="🔍 Rechercher les vols"; return; }
+
+  status.innerHTML = `🔍 Résolution aéroport destination : ${destQ}…`;
+  const destPlaces = await fetch(`/api/airport?q=${encodeURIComponent(destQ)}`).then(r=>r.json());
+  const dest = (destPlaces.find(p=>p.placeType==="AIRPORT") || destPlaces[0]);
+  if (!dest) { status.innerHTML = "❌ Aéroport destination introuvable."; btn.disabled=false; btn.innerHTML="🔍 Rechercher les vols"; return; }
+
+  const children = parseInt(document.getElementById("children").value)||0;
+  const ages = Array.from({length:children},(_,i)=>document.getElementById(`age_${i}`)?.value||4).join(",");
+
+  status.innerHTML = `✈ Recherche vols ${orig.skyId} → ${dest.skyId}…`;
+
+  // 2. Chercher vols
+  const body = {
+    orig_sky: orig.skyId, orig_entity: orig.entityId,
+    dest_sky: dest.skyId, dest_entity: dest.entityId,
+    dep:  document.getElementById("dep").value,
+    ret:  document.getElementById("ret").value || null,
+    adults: parseInt(document.getElementById("adults").value)||1,
+    children, ages,
+    cabin:  document.getElementById("cabin").value,
+    direct: document.getElementById("direct").checked,
+    budget: parseFloat(document.getElementById("budget").value)||null,
+  };
+
+  const data = await fetch("/api/search", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+  }).then(r=>r.json());
+
+  btn.disabled = false; btn.innerHTML = "🔍 Rechercher les vols";
+
+  if (!data.length) {
+    status.innerHTML = "⚠️ Aucun vol trouvé. Essayez d'augmenter le budget ou désactiver «Directs».";
+    return;
+  }
+
+  status.innerHTML = `✅ ${data.length} vol(s) trouvé(s) pour ${orig.name} → ${dest.name}`;
+  renderResults(data);
+}
+
+// ── Affichage résultats ────────────────────────────────────────
+function renderResults(data) {
+  const container = document.getElementById("results");
+  container.innerHTML = "";
+
+  data.forEach((it, i) => {
+    const cls = i===0 ? "best" : (i<=2 ? "second" : "");
+    const badge = i===0 ? '<span class="badge">🏆 MEILLEUR PRIX</span>' : `<span style="color:var(--gray);font-size:.85rem">#${i+1}</span>`;
+
+    const legs = it.legs.map(leg => {
+      const direct = leg.stops===0;
+      const stopTag = direct
+        ? '<span class="tag-direct">✅ DIRECT</span>'
+        : `<span class="tag-stop">⚠️ ${leg.stops} escale(s)</span>`;
+      return `
+        <div class="leg">
+          <div>
+            <div class="leg-route">${leg.origin} → ${leg.destination}</div>
+            <div class="leg-time">${leg.departure} → ${leg.arrival}</div>
+          </div>
+          <div class="leg-info">
+            <span class="tag-dur">⏱ ${leg.duration}</span>
+            ${stopTag}
+            <span class="tag-carrier">✈ ${leg.carriers.join(", ")}</span>
+          </div>
+        </div>`;
+    }).join("");
+
+    const card = document.createElement("div");
+    card.className = `result-card ${cls}`;
+    card.innerHTML = `
+      <div class="result-header">
+        <div class="price">EUR ${it.prix.toLocaleString("fr-FR",{minimumFractionDigits:2})}</div>
+        ${badge}
+      </div>
+      ${legs}
+      <div class="booking-btns">
+        <button class="btn-book btn-af" onclick="openPrivate('${it.airfrance_url}')">
+          ✈ Air France Direct
+        </button>
+        <button class="btn-book btn-gf" onclick="openGF('${it.orig_sky||""}','${it.dest_sky||""}')">
+          🔍 Google Flights
+        </button>
+        <button class="btn-book btn-copy" onclick="copyLink('${it.airfrance_url}')">
+          📋 Copier lien Air France
+        </button>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+// ── Actions boutons ────────────────────────────────────────────
+function openPrivate(url) {
+  // Ouvre dans un nouvel onglet (en mode privé si déjà dans une fenêtre privée)
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function openGF(orig, dest) {
+  const dep = document.getElementById("dep").value;
+  const ret = document.getElementById("ret").value;
+  const adu = document.getElementById("adults").value;
+  const url = `https://www.google.com/travel/flights?hl=fr&curr=EUR&q=vols+${orig}+${dest}+${dep}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const t = document.getElementById("toast");
+    t.style.display = "block";
+    setTimeout(()=>t.style.display="none", 3000);
+  });
+}
+</script>
+</body>
+</html>
