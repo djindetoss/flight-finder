@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-import requests, os, re
+import requests, os, re, time, threading, hashlib, json
 
 app = Flask(__name__)
 
@@ -7,7 +7,32 @@ API_KEY  = os.environ.get("RAPIDAPI_KEY", "86d656bf45msh5e9078844da826cp1f1591js
 API_HOST = "skyscanner-flights-travel-api.p.rapidapi.com"
 HEADERS  = {"x-rapidapi-key": API_KEY, "x-rapidapi-host": API_HOST}
 
-# Liens directs compagnies (sans OTA)
+# ── Cache thread-safe (TTL 10 min) ─────────────────────────────
+_cache      = {}
+_cache_lock = threading.Lock()
+CACHE_TTL   = 600  # secondes
+
+def cache_get(key):
+    with _cache_lock:
+        entry = _cache.get(key)
+        if entry and (time.time() - entry["ts"]) < CACHE_TTL:
+            return entry["data"]
+    return None
+
+def cache_set(key, data):
+    with _cache_lock:
+        _cache[key] = {"data": data, "ts": time.time()}
+        # Nettoyage si trop grand
+        if len(_cache) > 500:
+            now = time.time()
+            expired = [k for k, v in _cache.items() if (now - v["ts"]) > CACHE_TTL]
+            for k in expired:
+                del _cache[k]
+
+def make_key(*args):
+    return hashlib.md5(json.dumps(args, sort_keys=True).encode()).hexdigest()
+
+# ── Liens directs compagnies ────────────────────────────────────
 AIRLINE_URLS = {
     "air france":         "https://wwws.airfrance.fr/search/offers",
     "royal air maroc":    "https://www.royalairmaroc.com/fr-fr/reservation/recherche-vol",
@@ -30,9 +55,7 @@ AIRLINE_URLS = {
 }
 
 def get_airline_url(carrier_name, legs, adults=1, children=0):
-    """Génère un lien direct vers la compagnie selon le vol."""
     key = carrier_name.lower()
-
     if "air france" in key:
         segments = ",".join(
             f"{l['origin']}:{l['destination']}:{l['departure'][:10]}"
@@ -42,39 +65,53 @@ def get_airline_url(carrier_name, legs, adults=1, children=0):
         if children:
             pax += f"_CHD:{children}"
         return f"https://wwws.airfrance.fr/search/offers?pax={pax}&cabin=ECONOMY&segments={segments}"
-
     for airline_key, url in AIRLINE_URLS.items():
         if airline_key in key:
             return url
-
-    # Fallback Google Flights
     return "https://www.google.com/travel/flights?hl=fr&curr=EUR"
 
-
+# ── Routes ──────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/api/airport")
 def airport():
-    q = request.args.get("q","")
-    r = requests.get(f"https://{API_HOST}/flights/searchAirport",
-                     headers=HEADERS,
-                     params={"market":"FR","query":q,"locale":"fr-FR"}, timeout=15)
-    places = r.json().get("places",[])
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+
+    ck = make_key("airport", q)
+    cached = cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        r = requests.get(
+            f"https://{API_HOST}/flights/searchAirport",
+            headers=HEADERS,
+            params={"market": "FR", "query": q, "locale": "fr-FR"},
+            timeout=15
+        )
+        places = r.json().get("places", [])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    cache_set(ck, places)
     return jsonify(places)
 
 @app.route("/api/search", methods=["POST"])
 def search():
-    d = request.json
+    d = request.get_json(force=True)
+
     params = dict(
         originSkyId         = d["orig_sky"],
         destinationSkyId    = d["dest_sky"],
         originEntityId      = d["orig_entity"],
         destinationEntityId = d["dest_entity"],
         date                = d["dep"],
-        cabinClass          = d.get("cabin","economy"),
-        adults              = str(d.get("adults",1)),
+        cabinClass          = d.get("cabin", "economy"),
+        adults              = str(d.get("adults", 1)),
         currency            = "EUR",
         market              = "FR",
         countryCode         = "FR",
@@ -85,58 +122,65 @@ def search():
     if d.get("children"): params["children"]     = str(d["children"])
     if d.get("ages"):     params["childrenAges"] = d["ages"]
 
-    r = requests.get(f"https://{API_HOST}/flights/searchFlights",
-                     headers=HEADERS, params=params, timeout=60)
-    itin = r.json().get("itineraries",[])
+    # Cache clé = tous les paramètres de recherche
+    ck = make_key("search", params, d.get("direct"), d.get("budget"))
+    cached = cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        r = requests.get(
+            f"https://{API_HOST}/flights/searchFlights",
+            headers=HEADERS, params=params, timeout=60
+        )
+        itin = r.json().get("itineraries", [])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
     if d.get("direct"):
-        itin = [i for i in itin if all(l.get("stopCount",1)==0 for l in i.get("legs",[]))]
+        itin = [i for i in itin if all(l.get("stopCount", 1) == 0 for l in i.get("legs", []))]
     if d.get("budget"):
-        itin = [i for i in itin if float(i.get("price",{}).get("amount",9e9)) <= d["budget"]]
+        itin = [i for i in itin if float(i.get("price", {}).get("amount", 9e9)) <= d["budget"]]
 
-    itin.sort(key=lambda x: float(x.get("price",{}).get("amount",9e9)))
+    itin.sort(key=lambda x: float(x.get("price", {}).get("amount", 9e9)))
 
-    results = []
-    adults   = d.get("adults",1)
-    children = d.get("children",0)
+    adults   = d.get("adults", 1)
+    children = d.get("children", 0)
+    results  = []
 
     for it in itin[:8]:
         prix = float(it["price"]["amount"])
 
         legs_data = []
-        for leg in it.get("legs",[]):
-            dur = leg.get("durationMinutes",0)
+        for leg in it.get("legs", []):
+            dur = leg.get("durationMinutes", 0)
             legs_data.append({
-                "origin":      leg.get("origin",""),
-                "destination": leg.get("destination",""),
-                "departure":   leg.get("departure","")[:16].replace("T"," "),
-                "arrival":     leg.get("arrival","")[:16].replace("T"," "),
+                "origin":      leg.get("origin", ""),
+                "destination": leg.get("destination", ""),
+                "departure":   leg.get("departure", "")[:16].replace("T", " "),
+                "arrival":     leg.get("arrival", "")[:16].replace("T", " "),
                 "duration":    f"{dur//60}h{dur%60:02d}",
-                "stops":       leg.get("stopCount",0),
-                "carriers":    [c.get("name","") for c in leg.get("carriers",[])],
+                "stops":       leg.get("stopCount", 0),
+                "carriers":    [c.get("name", "") for c in leg.get("carriers", [])],
             })
 
-        # Compagnie principale = 1er transporteur du 1er leg
         primary_carrier = ""
         if it.get("legs") and it["legs"][0].get("carriers"):
-            primary_carrier = it["legs"][0]["carriers"][0].get("name","")
+            primary_carrier = it["legs"][0]["carriers"][0].get("name", "")
 
-        airline_url  = get_airline_url(primary_carrier, legs_data, adults, children)
-
-        # Google Flights
         o  = legs_data[0]["origin"]
         de = legs_data[0]["destination"]
-        gf_url = f"https://www.google.com/travel/flights?hl=fr&curr=EUR&q=vols+{o}+{de}"
 
         results.append({
-            "prix":           prix,
-            "legs":           legs_data,
+            "prix":            prix,
+            "legs":            legs_data,
             "primary_carrier": primary_carrier,
-            "airline_url":    airline_url,
-            "google_url":     gf_url,
+            "airline_url":     get_airline_url(primary_carrier, legs_data, adults, children),
+            "google_url":      f"https://www.google.com/travel/flights?hl=fr&curr=EUR&q=vols+{o}+{de}",
         })
 
+    cache_set(ck, results)
     return jsonify(results)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5050)
+    app.run(debug=False, threaded=True, port=5050)
