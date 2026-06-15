@@ -363,7 +363,7 @@ function renderResults(data, totalPax) {
       ${legs}
       <div class="fare-note">
         ⚠️ <strong>Prix affiché = tarif "Light"</strong> (bagage cabine uniquement, sans valise en soute).<br>
-        🧳 <strong>Avec 1 valise/passager (${totalPax} valises)</strong> : estimé <span class="fare-std">~EUR ${(it.prix + totalPax * 150).toLocaleString("fr-FR",{minimumFractionDigits:2})}</span> (+150€/pers.) — choisissez <span class="fare-light">✅ "Light"</span> sur le site pour garder ce prix.<br>
+        🧳 <strong>Avec 1 valise/passager (${totalPax} valises)</strong> : estimé <span class="fare-std">~EUR ${(it.prix + totalPax * 400).toLocaleString("fr-FR",{minimumFractionDigits:2})}</span> (+400€/pers.) — choisissez <span class="fare-light">✅ "Light"</span> sur le site pour garder ce prix.<br>
         💡 Ajouter les bagages séparément après réservation est souvent moins cher que le tarif Standard.
       </div>
       <div class="booking-btns">
